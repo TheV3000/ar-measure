@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="description" content="Private on-device AR measuring. No data leaves your phone.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'; manifest-src 'self'; media-src 'none'">
+<title>Private Measure</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0f14'/%3E%3Cpath d='M12 44 L32 12 L52 44 Z' fill='none' stroke='%234ade80' stroke-width='4'/%3E%3Ccircle cx='32' cy='36' r='4' fill='%234ade80'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0b0f14;
+  --panel: #141a22;
+  --panel2: #1c2430;
+  --border: #2a3544;
+  --text: #e8eef6;
+  --muted: #8b9bb0;
+  --accent: #4ade80;
+  --accent2: #38bdf8;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --btn: #243041;
+  --btn-active: #2f4058;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+#app { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+#startScreen, #listScreen, #helpScreen {
+  position: absolute; inset: 0; z-index: 40;
+  background: var(--bg); overflow-y: auto;
+  padding: 20px 16px calc(24px + var(--safe-bottom));
+}
+.hidden { display: none !important; }
+h1 { font-size: 1.45rem; margin: 0 0 6px; font-weight: 700; }
+h2 { font-size: 1.05rem; margin: 18px 0 8px; color: var(--accent); }
+.sub { color: var(--muted); font-size: 0.92rem; line-height: 1.45; margin: 0 0 16px; }
+.card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 14px; margin-bottom: 12px;
+}
+.card p { margin: 0 0 8px; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+.card p:last-child { margin-bottom: 0; }
+.privacy {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px; margin: 8px 0 16px;
+  color: var(--muted); font-size: 0.88rem; line-height: 1.4;
+}
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+button, .btn {
+  appearance: none; border: 1px solid var(--border);
+  background: var(--btn); color: var(--text);
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 0.95rem; font-weight: 600;
+  min-height: 48px; cursor: pointer;
+  flex: 1 1 auto;
+}
+button:active, .btn:active { background: var(--btn-active); }
+button.primary { background: var(--accent); color: #052e16; border-color: transparent; }
+button.primary:active { filter: brightness(0.92); }
+button.danger { background: #3a1a1a; color: var(--danger); border-color: #5a2a2a; }
+button.ghost { background: transparent; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.selected { outline: 2px solid var(--accent); background: var(--btn-active); }
+#arRoot {
+  flex: 1; position: relative; width: 100%; height: 100%;
+  background: #000;
+}
+#overlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; flex-direction: column; pointer-events: none;
+}
+#overlay .hit { pointer-events: auto; }
+#topBar {
+  display: flex; gap: 6px; padding: 10px 10px 6px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.72), transparent);
+}
+#topBar button { flex: 0 0 auto; min-width: 64px; padding: 10px 12px; font-size: 0.85rem; }
+#modeBar {
+  display: flex; gap: 6px; padding: 0 10px; margin-top: 4px;
+}
+#modeBar button { font-size: 0.82rem; padding: 10px 10px; }
+#liveReadout {
+  margin: 10px auto 0; padding: 10px 16px;
+  background: rgba(11,15,20,0.78); border: 1px solid var(--border);
+  border-radius: 999px; font-size: 1.15rem; font-weight: 700;
+  letter-spacing: 0.02em; text-align: center; max-width: 92%;
+  color: var(--accent); backdrop-filter: blur(6px);
+}
+#hint {
+  margin: 8px auto 0; padding: 6px 12px;
+  color: var(--muted); font-size: 0.82rem; text-align: center;
+  background: rgba(11,15,20,0.55); border-radius: 8px; max-width: 92%;
+}
+#bottomBar {
+  margin-top: auto;
+  padding: 8px 10px calc(12px + var(--safe-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.82), transparent);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#actionRow, #utilRow { display: flex; gap: 6px; }
+#statusPill {
+  align-self: center; font-size: 0.75rem; color: var(--muted);
+  background: rgba(20,26,34,0.8); padding: 4px 10px; border-radius: 999px;
+}
+#savePanel {
+  position: absolute; left: 10px; right: 10px; bottom: calc(90px + var(--safe-bottom));
+  z-index: 20; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px; pointer-events: auto;
+}
+#savePanel input {
+  width: 100%; background: var(--panel2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; padding: 12px; font-size: 1rem;
+  margin: 8px 0 10px;
+}
+.saved-item {
+  background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px; margin-bottom: 8px;
+}
+.saved-item .name { font-weight: 700; margin-bottom: 4px; }
+.saved-item .meta { color: var(--muted); font-size: 0.82rem; }
+.saved-item .vals { margin-top: 6px; font-size: 0.95rem; white-space: pre-wrap; }
+.empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+.warn { color: var(--warn); }
+.err { color: var(--danger); }
+ul.tips { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+ul.tips li { margin-bottom: 6px; }
+#unsupportedBox { border-color: #5a2a2a; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Start / gate screen -->
+  <section id="startScreen">
+    <h1>Private Measure</h1>
+    <p class="sub">On-device AR measuring for objects, furniture, and rooms. Nothing leaves your phone.</p>
+    <div class="privacy">
+      <strong style="color:var(--accent)">Privacy:</strong> No accounts, ads, analytics, or network calls after load.
+      Measurements stay in this browser’s local storage on your phone only. Open in Incognito if you also want no Chrome history of this page.
+    </div>
+    <div class="card hidden" id="unsupportedBox">
+      <p class="err"><strong>WebXR AR not available on this browser/device.</strong></p>
+      <p>Use Chrome on an Android phone that supports ARCore. Then return here and tap Start AR.</p>
+    </div>
+    <div class="card">
+      <p><strong>Accuracy tips</strong></p>
+      <ul class="tips">
+        <li>Good light and textured floors/walls work best (rugs, wood grain, tile).</li>
+        <li>Move the phone slowly to scan the surface before placing points.</li>
+        <li>Expect roughly ±1 inch over a few feet; blank walls and dim light are worse.</li>
+        <li>For rooms, walk the floor corners in order around the perimeter.</li>
+      </ul>
+    </div>
+    <div class="btnrow">
+      <button id="btnStart" class="primary" type="button">Start AR</button>
+    </div>
+    <div class="btnrow">
+      <button id="btnOpenList" type="button">Saved measurements</button>
+      <button id="btnOpenHelp" type="button">How to use</button>
+    </div>
+  </section>
+
+  <!-- Help -->
+  <section id="helpScreen" class="hidden">
+    <h1>How to use</h1>
+    <h2>Line</h2>
+    <p class="sub">Tap two points. Shows length between them. Tap again to start a new line, or Undo/Reset.</p>
+    <h2>Furniture / Box</h2>
+    <p class="sub">1) Tap two corners of the front edge (width). 2) Tap a point for depth. 3) Tap a point up for height (or on the top surface). Shows W × D × H.</p>
+    <h2>Room</h2>
+    <p class="sub">Tap floor corners in order around the room. Shows each wall, perimeter, and floor area (sq ft or m²). Optionally tap a wall/ceiling point for height after closing the floor polygon (tap near the first corner to close).</p>
+    <h2>Units</h2>
+    <p class="sub">Toggle ft/in or metric anytime. Saved items keep the unit used when saved.</p>
+    <div class="btnrow">
+      <button id="btnHelpBack" class="primary" type="button">Back</button>
+    </div>
+  </section>
+
+  <!-- Saved list -->
+  <section id="listScreen" class="hidden">
+    <h1>Saved</h1>
+    <p class="sub">Stored only in this browser on this phone (localStorage). Clearing site data or using Incognito will remove them.</p>
+    <div id="savedList"></div>
+    <div class="btnrow">
+      <button id="btnListBack" class="primary" type="button">Back</button>
+      <button id="btnDeleteAll" class="danger" type="button">Delete all</button>
+    </div>
+  </section>
+
+  <!-- AR session UI (dom-overlay) -->
+  <div id="arRoot" class="hidden">
+    <div id="overlay">
+      <div id="topBar" class="hit">
+        <button id="btnExit" type="button">Exit</button>
+        <button id="btnUnits" type="button">ft/in</button>
+        <button id="btnSavedInAr" type="button">Saved</button>
+      </div>
+      <div id="modeBar" class="hit">
+        <button id="modeLine" class="selected" type="button" data-mode="line">Line</button>
+        <button id="modeBox" type="button" data-mode="box">Furniture</button>
+        <button id="modeRoom" type="button" data-mode="room">Room</button>
+      </div>
+      <div id="liveReadout">—</div>
+      <div id="hint">Move phone to find a surface, then tap to place a point</div>
+      <div id="bottomBar" class="hit">
+        <div id="statusPill">Scanning…</div>
+        <div id="actionRow">
+          <button id="btnUndo" type="button">Undo</button>
+          <button id="btnReset" type="button">Reset</button>
+          <button id="btnSave" class="primary" type="button">Save</button>
+        </div>
+      </div>
+      <div id="savePanel" class="hidden">
+        <strong>Save measurement</strong>
+        <input id="saveName" type="text" maxlength="80" placeholder="Optional name" autocomplete="off" enterkeyhint="done">
+        <div class="btnrow">
+          <button id="btnSaveCancel" type="button">Cancel</button>
+          <button id="btnSaveConfirm" class="primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const STORAGE_KEY = 'private-measure-v1';
+  const M_TO_FT = 3.280839895;
+  const M_TO_IN = 39.37007874;
+
+  const els = {
+    start: document.getElementById('startScreen'),
+    help: document.getElementById('helpScreen'),
+    list: document.getElementById('listScreen'),
+    arRoot: document.getElementById('arRoot'),
+    unsupported: document.getElementById('unsupportedBox'),
+    btnStart: document.getElementById('btnStart'),
+    btnOpenList: document.getElementById('btnOpenList'),
+    btnOpenHelp: document.getElementById('btnOpenHelp'),
+    btnHelpBack: document.getElementById('btnHelpBack'),
+    btnListBack: document.getElementById('btnListBack'),
+    btnDeleteAll: document.getElementById('btnDeleteAll'),
+    savedList: document.getElementById('savedList'),
+    overlay: document.getElementById('overlay'),
+    live: document.getElementById('liveReadout'),
+    hint: document.getElementById('hint'),
+    status: document.getElementById('statusPill'),
+    btnExit: document.getElementById('btnExit'),
+    btnUnits: document.getElementById('btnUnits'),
+    btnSavedInAr: document.getElementById('btnSavedInAr'),
+    btnUndo: document.getElementById('btnUndo'),
+    btnReset: document.getElementById('btnReset'),
+    btnSave: document.getElementById('btnSave'),
+    savePanel: document.getElementById('savePanel'),
+    saveName: document.getElementById('saveName'),
+    btnSaveCancel: document.getElementById('btnSaveCancel'),
+    btnSaveConfirm: document.getElementById('btnSaveConfirm'),
+    modeLine: document.getElementById('modeLine'),
+    modeBox: document.getElementById('modeBox'),
+    modeRoom: document.getElementById('modeRoom'),
+  };
+
+  let units = 'imperial'; // imperial | metric
+  let mode = 'line'; // line | box | room
+  let xrSession = null;
+  let gl = null;
+  let canvas = null;
+  let refSpace = null;
+  let viewerSpace = null;
+  let hitTestSource = null;
+  let xrLayer = null;
+  let reticlePose = null;
+  let lastFrameTime = 0;
+
+  // Measurement state
+  // points: {x,y,z} in ref space meters
+  let points = [];
+  let roomClosed = false;
+  let roomHeightM = null;
+  let previewPoint = null; // live hover from reticle
+
+  // Transient Three-less rendering: draw markers as DOM? Better: WebGL markers.
+  // Keep simple WebGL: clear + draw reticle circle + lines as colored quads/lines via 2D overlay projection is hard.
+  // Approach: use WebGL for XR framebuffer only (required), draw reticle as a small textured quad at hit pose,
+  // and draw measurement lines as GL_LINES in world space.
+
+  const state = {
+    program: null,
+    lineProgram: null,
+    reticleBuf: null,
+    lineBuf: null,
+    uMVP: null,
+    uColor: null,
+    aPos: null,
+  };
+
+  function show(screen) {
+    els.start.classList.add('hidden');
+    els.help.classList.add('hidden');
+    els.list.classList.add('hidden');
+    els.arRoot.classList.add('hidden');
+    if (screen === 'start') els.start.classList.remove('hidden');
+    if (screen === 'help') els.help.classList.remove('hidden');
+    if (screen === 'list') els.list.classList.remove('hidden');
+    if (screen === 'ar') els.arRoot.classList.remove('hidden');
+  }
+
+  function loadSaved() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function persistSaved(arr) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+
+  function formatLength(meters) {
+    if (meters == null || !isFinite(meters)) return '—';
+    if (units === 'metric') {
+      if (meters >= 1) return (meters).toFixed(2) + ' m';
+      return (meters * 100).toFixed(1) + ' cm';
+    }
+    const inchesTotal = meters * M_TO_IN;
+    const ft = Math.floor(inchesTotal / 12);
+    let inches = inchesTotal - ft * 12;
+    // round to 0.1 in
+    inches = Math.round(inches * 10) / 10;
+    if (inches >= 12) { return (ft + 1) + ' ft 0 in'; }
+    if (ft === 0) return inches.toFixed(1) + ' in';
+    return ft + ' ft ' + inches.toFixed(1) + ' in';
+  }
+
+  function formatArea(sqMeters) {
+    if (sqMeters == null || !isFinite(sqMeters)) return '—';
+    if (units === 'metric') return sqMeters.toFixed(2) + ' m²';
+    const sqFt = sqMeters * 10.76391041671;
+    return sqFt.toFixed(1) + ' sq ft';
+  }
+
+  function dist(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  function horizontalDist(a, b) {
+    const dx = a.x - b.x, dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dz * dz);
+  }
+
+  function posePosition(pose) {
+    const t = pose.transform.position;
+    return { x: t.x, y: t.y, z: t.z };
+  }
+
+  function polygonAreaXZ(pts) {
+    // Shoelace on XZ plane (Y up)
+    if (pts.length < 3) return 0;
+    let sum = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      sum += a.x * b.z - b.x * a.z;
+    }
+    return Math.abs(sum) * 0.5;
+  }
+
+  function updateUnitsButton() {
+    els.btnUnits.textContent = units === 'imperial' ? 'ft/in' : 'm/cm';
+  }
+
+  function setMode(m) {
+    mode = m;
+    [els.modeLine, els.modeBox, els.modeRoom].forEach(function (b) {
+      b.classList.toggle('selected', b.getAttribute('data-mode') === m);
+    });
+    resetMeasure(false);
+    updateHint();
+    updateReadout();
+  }
+
+  function resetMeasure(keepMode) {
+    points = [];
+    roomClosed = false;
+    roomHeightM = null;
+    previewPoint = null;
+    if (!keepMode) { /* mode unchanged */ }
+    updateHint();
+    updateReadout();
+  }
+
+  function updateHint() {
+    if (mode === 'line') {
+      if (points.length === 0) els.hint.textContent = 'Line: tap first point';
+      else if (points.length === 1) els.hint.textContent = 'Line: tap second point';
+      else els.hint.textContent = 'Line complete — Undo or Reset for a new one, or tap to start over';
+    } else if (mode === 'box') {
+      if (points.length === 0) els.hint.textContent = 'Furniture: tap first front corner';
+      else if (points.length === 1) els.hint.textContent = 'Tap second front corner (width)';
+      else if (points.length === 2) els.hint.textContent = 'Tap a back corner for depth';
+      else if (points.length === 3) els.hint.textContent = 'Tap top surface or raise phone & tap for height';
+      else els.hint.textContent = 'Furniture done — Save, Undo, or Reset';
+    } else {
+      if (!roomClosed) {
+        if (points.length === 0) els.hint.textContent = 'Room: tap first floor corner';
+        else if (points.length < 3) els.hint.textContent = 'Keep tapping floor corners in order';
+        else els.hint.textContent = 'Tap next corner, or tap near the first corner to close';
+      } else if (roomHeightM == null) {
+        els.hint.textContent = 'Optional: tap a point up the wall/ceiling for height';
+      } else {
+        els.hint.textContent = 'Room done — Save, Undo, or Reset';
+      }
+    }
+  }
+
+  function currentSummary() {
+    if (mode === 'line') {
+      if (points.length >= 2) {
+        const d = dist(points[0], points[1]);
+        return { title: 'Line', text: formatLength(d), detail: formatLength(d), meters: { length: d }, ok: true };
+      }
+      if (points.length === 1 && previewPoint) {
+        const d = dist(points[0], previewPoint);
+        return { title: 'Line', text: formatLength(d), detail: '', meters: null, ok: false };
+      }
+      return { title: 'Line', text: '—', detail: '', meters: null, ok: false };
+    }
+    if (mode === 'box') {
+      if (points.length >= 4) {
+        const w = horizontalDist(points[0], points[1]);
+        // depth: horizontal distance from midpoint of width edge projected — use distance from p2 to the width segment, approx horizontalDist of p2 to nearest of p0/p1 line
+        const depth = pointToSegmentDistXZ(points[2], points[0], points[1]);
+        const height = Math.abs(points[3].y - ((points[0].y + points[1].y + points[2].y) / 3));
+        const text = formatLength(w) + ' × ' + formatLength(depth) + ' × ' + formatLength(height);
+        return { title: 'Furniture', text: text, detail: 'W ' + formatLength(w) + '\nD ' + formatLength(depth) + '\nH ' + formatLength(height), meters: { w: w, d: depth, h: height }, ok: true };
+      }
+      if (points.length === 1 && previewPoint) {
+        return { title: 'Furniture', text: 'W ' + formatLength(horizontalDist(points[0], previewPoint)), detail: '', meters: null, ok: false };
+      }
+      if (points.length === 2 && previewPoint) {
+        const w = horizontalDist(points[0], points[1]);
+        const depth = pointToSegmentDistXZ(previewPoint, points[0], points[1]);
+        return { title: 'Furniture', text: 'W ' + formatLength(w) + ' · D ' + formatLength(depth), detail: '', meters: null, ok: false };
+      }
+      if (points.length === 3 && previewPoint) {
+        const w = horizontalDist(points[0], points[1]);
+        const depth = pointToSegmentDistXZ(points[2], points[0], points[1]);
+        const baseY = (points[0].y + points[1].y + points[2].y) / 3;
+        const height = Math.abs(previewPoint.y - baseY);
+        return { title: 'Furniture', text: formatLength(w) + ' × ' + formatLength(depth) + ' × ' + formatLength(height), detail: '', meters: null, ok: false };
+      }
+      if (points.length === 2) {
+        return { title: 'Furniture', text: 'W ' + formatLength(horizontalDist(points[0], points[1])), detail: '', meters: null, ok: false };
+      }
+      return { title: 'Furniture', text: '—', detail: '', meters: null, ok: false };
+    }
+    // room
+    if (points.length >= 2) {
+      const walls = [];
+      const n = roomClosed ? points.length : points.length;
+      for (let i = 0; i < n - (roomClosed ? 0 : 1); i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        if (!roomClosed && i === n - 1) break;
+        walls.push(horizontalDist(a, b));
+      }
+      // live preview wall
+      if (!roomClosed && previewPoint && points.length >= 1) {
+        walls.push(horizontalDist(points[points.length - 1], previewPoint));
+      }
+      let perimeter = 0;
+      walls.forEach(function (w) { perimeter += w; });
+      let area = 0;
+      if (roomClosed) area = polygonAreaXZ(points);
+      else if (points.length >= 2 && previewPoint) area = polygonAreaXZ(points.concat([previewPoint]));
+      let text = roomClosed ? formatArea(area) : (walls.length ? formatLength(walls[walls.length - 1]) : '—');
+      if (roomClosed && roomHeightM != null) text = formatArea(area) + ' · H ' + formatLength(roomHeightM);
+      let detail = '';
+      walls.forEach(function (w, i) {
+        if (roomClosed || i < walls.length - (previewPoint && !roomClosed ? 1 : 0)) {
+          detail += 'Wall ' + (i + 1) + ': ' + formatLength(w) + '\n';
+        }
+      });
+      if (roomClosed) {
+        detail += 'Perimeter: ' + formatLength(perimeter) + '\n';
+        detail += 'Floor: ' + formatArea(area);
+        if (roomHeightM != null) detail += '\nHeight: ' + formatLength(roomHeightM);
+      }
+      return {
+        title: 'Room',
+        text: text,
+        detail: detail,
+        meters: roomClosed ? { walls: walls.slice(), perimeter: perimeter, area: area, height: roomHeightM } : null,
+        ok: roomClosed
+      };
+    }
+    if (points.length === 1 && previewPoint) {
+      return { title: 'Room', text: formatLength(horizontalDist(points[0], previewPoint)), detail: '', meters: null, ok: false };
+    }
+    return { title: 'Room', text: '—', detail: '', meters: null, ok: false };
+  }
+
+  function pointToSegmentDistXZ(p, a, b) {
+    const abx = b.x - a.x, abz = b.z - a.z;
+    const apx = p.x - a.x, apz = p.z - a.z;
+    const ab2 = abx * abx + abz * abz;
+    let t = ab2 > 0 ? (apx * abx + apz * abz) / ab2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * abx, cz = a.z + t * abz;
+    const dx = p.x - cx, dz = p.z - cz;
+    return Math.sqrt(dx * dx + dz * dz);
+  }
+
+  function updateReadout() {
+    const s = currentSummary();
+    els.live.textContent = s.text;
+  }
+
+  function placePoint(pos) {
+    if (mode === 'line') {
+      if (points.length >= 2) {
+        points = [pos];
+      } else {
+        points.push(pos);
+      }
+    } else if (mode === 'box') {
+      if (points.length >= 4) {
+        points = [pos];
+      } else {
+        points.push(pos);
+      }
+    } else {
+      // room
+      if (roomClosed) {
+        if (roomHeightM == null) {
+          const baseY = points.reduce(function (s, p) { return s + p.y; }, 0) / points.length;
+          roomHeightM = Math.abs(pos.y - baseY);
+        } else {
+          // start new room
+          points = [pos];
+          roomClosed = false;
+          roomHeightM = null;
+        }
+      } else {
+        if (points.length >= 3) {
+          const close = horizontalDist(pos, points[0]);
+          if (close < 0.25) {
+            roomClosed = true;
+          } else {
+            points.push(pos);
+          }
+        } else {
+          points.push(pos);
+        }
+      }
+    }
+    updateHint();
+    updateReadout();
+  }
+
+  function undo() {
+    if (mode === 'room' && roomClosed && roomHeightM != null) {
+      roomHeightM = null;
+    } else if (mode === 'room' && roomClosed) {
+      roomClosed = false;
+    } else if (points.length) {
+      points.pop();
+    }
+    updateHint();
+    updateReadout();
+  }
+
+  // ——— WebGL helpers ———
+  function initGL(session) {
+    canvas = document.createElement('canvas');
+    // Keep canvas out of layout; XR uses it as baseLayer
+    canvas.style.display = 'none';
+    document.body.appendChild(canvas);
+    gl = canvas.getContext('webgl', { xrCompatible: true });
+    if (!gl) throw new Error('WebGL unavailable');
+
+    const vs = `
+      attribute vec3 aPos;
+      uniform mat4 uMVP;
+      void main() {
+        gl_Position = uMVP * vec4(aPos, 1.0);
+        gl_PointSize = 12.0;
+      }
+    `;
+    const fs = `
+      precision mediump float;
+      uniform vec4 uColor;
+      void main() { gl_FragColor = uColor; }
+    `;
+    state.program = createProgram(vs, fs);
+    state.aPos = gl.getAttribLocation(state.program, 'aPos');
+    state.uMVP = gl.getUniformLocation(state.program, 'uMVP');
+    state.uColor = gl.getUniformLocation(state.program, 'uColor');
+    state.lineBuf = gl.createBuffer();
+    state.reticleBuf = gl.createBuffer();
+
+    // Reticle ring in local space (XZ circle)
+    const ring = [];
+    const N = 48;
+    for (let i = 0; i < N; i++) {
+      const a0 = (i / N) * Math.PI * 2;
+      const a1 = ((i + 1) / N) * Math.PI * 2;
+      ring.push(Math.cos(a0) * 0.08, 0, Math.sin(a0) * 0.08);
+      ring.push(Math.cos(a1) * 0.08, 0, Math.sin(a1) * 0.08);
+    }
+    // crosshair
+    ring.push(-0.04, 0, 0, 0.04, 0, 0, 0, 0, -0.04, 0, 0, 0.04);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.reticleBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ring), gl.STATIC_DRAW);
+
+    return gl;
+  }
+
+  function createProgram(vsSrc, fsSrc) {
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, vsSrc);
+    gl.compileShader(vs);
+    if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(vs));
+    }
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, fsSrc);
+    gl.compileShader(fs);
+    if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(fs));
+    }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(prog));
+    }
+    return prog;
+  }
+
+  function mat4Multiply(a, b) {
+    const o = new Float32Array(16);
+    for (let c = 0; c < 4; c++) {
+      for (let r = 0; r < 4; r++) {
+        o[c * 4 + r] =
+          a[0 * 4 + r] * b[c * 4 + 0] +
+          a[1 * 4 + r] * b[c * 4 + 1] +
+          a[2 * 4 + r] * b[c * 4 + 2] +
+          a[3 * 4 + r] * b[c * 4 + 3];
+      }
+    }
+    return o;
+  }
+
+  function mat4FromXR(matrix) {
+    // XRRigidTransform.matrix is Float32Array column-major already
+    return matrix;
+  }
+
+  function mat4Translation(x, y, z) {
+    return new Float32Array([
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      x, y, z, 1
+    ]);
+  }
+
+  function drawLines(mvp, positions, color) {
+    if (!positions.length) return;
+    gl.useProgram(state.program);
+    gl.uniformMatrix4fv(state.uMVP, false, mvp);
+    gl.uniform4fv(state.uColor, color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.lineBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(state.aPos);
+    gl.vertexAttribPointer(state.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, positions.length / 3);
+  }
+
+  function drawPoints(mvp, positions, color) {
+    if (!positions.length) return;
+    gl.useProgram(state.program);
+    gl.uniformMatrix4fv(state.uMVP, false, mvp);
+    gl.uniform4fv(state.uColor, color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.lineBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(state.aPos);
+    gl.vertexAttribPointer(state.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.POINTS, 0, positions.length / 3);
+  }
+
+  function drawReticle(vp, pose) {
+    if (!pose) return;
+    const model = pose.transform.matrix;
+    const mvp = mat4Multiply(vp, model);
+    gl.useProgram(state.program);
+    gl.uniformMatrix4fv(state.uMVP, false, mvp);
+    gl.uniform4fv(state.uColor, [0.29, 0.87, 0.5, 0.95]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, state.reticleBuf);
+    gl.enableVertexAttribArray(state.aPos);
+    gl.vertexAttribPointer(state.aPos, 3, gl.FLOAT, false, 0, 0);
+    // 48 segments * 2 verts = 96, plus 4 crosshair verts
+    gl.drawArrays(gl.LINES, 0, 100);
+  }
+
+  function buildMeasureLines() {
+    const lines = [];
+    const pts = [];
+    points.forEach(function (p) { pts.push(p.x, p.y, p.z); });
+
+    function pushSeg(a, b) {
+      lines.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    }
+
+    if (mode === 'line') {
+      if (points.length >= 2) pushSeg(points[0], points[1]);
+      else if (points.length === 1 && previewPoint) pushSeg(points[0], previewPoint);
+    } else if (mode === 'box') {
+      if (points.length >= 2) pushSeg(points[0], points[1]);
+      if (points.length >= 3) {
+        // approximate rectangle on floor: p0-p1 width, depth from p2
+        const w = { x: points[1].x - points[0].x, z: points[1].z - points[0].z };
+        // project p2 onto perpendicular
+        pushSeg(points[1], points[2]);
+        pushSeg(points[2], points[0]);
+      }
+      if (points.length >= 4) {
+        const baseY = (points[0].y + points[1].y + points[2].y) / 3;
+        const top = { x: points[3].x, y: points[3].y, z: points[3].z };
+        const base = { x: points[3].x, y: baseY, z: points[3].z };
+        pushSeg(base, top);
+      } else if (points.length === 3 && previewPoint) {
+        const baseY = (points[0].y + points[1].y + points[2].y) / 3;
+        pushSeg({ x: previewPoint.x, y: baseY, z: previewPoint.z }, previewPoint);
+      } else if (points.length === 2 && previewPoint) {
+        pushSeg(points[1], previewPoint);
+        pushSeg(previewPoint, points[0]);
+      } else if (points.length === 1 && previewPoint) {
+        pushSeg(points[0], previewPoint);
+      }
+    } else {
+      for (let i = 0; i < points.length - 1; i++) pushSeg(points[i], points[i + 1]);
+      if (roomClosed && points.length >= 3) pushSeg(points[points.length - 1], points[0]);
+      else if (!roomClosed && previewPoint && points.length) pushSeg(points[points.length - 1], previewPoint);
+      if (roomClosed && roomHeightM != null) {
+        const p = points[0];
+        pushSeg(p, { x: p.x, y: p.y + roomHeightM, z: p.z });
+      }
+    }
+    return { lines: lines, pts: pts };
+  }
+
+  async function startAR() {
+    if (!navigator.xr) {
+      alert('WebXR not available.');
+      return;
+    }
+    let supported = false;
+    try {
+      supported = await navigator.xr.isSessionSupported('immersive-ar');
+    } catch (e) {
+      supported = false;
+    }
+    if (!supported) {
+      els.unsupported.classList.remove('hidden');
+      alert('This device/browser does not support immersive AR.');
+      return;
+    }
+
+    try {
+      xrSession = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test', 'dom-overlay'],
+        domOverlay: { root: els.overlay }
+      });
+    } catch (e) {
+      console.error(e);
+      // Fallback without requiring both if possible
+      try {
+        xrSession = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: els.overlay }
+        });
+      } catch (e2) {
+        alert('Could not start AR session: ' + (e2.message || e2));
+        return;
+      }
+    }
+
+    show('ar');
+    initGL(xrSession);
+    await gl.makeXRCompatible();
+
+    xrLayer = new XRWebGLLayer(xrSession, gl);
+    await xrSession.updateRenderState({ baseLayer: xrLayer });
+
+    refSpace = await xrSession.requestReferenceSpace('local');
+    viewerSpace = await xrSession.requestReferenceSpace('viewer');
+    hitTestSource = await xrSession.requestHitTestSource({ space: viewerSpace });
+
+    xrSession.addEventListener('end', onSessionEnd);
+    // Tap / select
+    els.overlay.addEventListener('click', onOverlayClick, true);
+    // Also XR select events
+    xrSession.addEventListener('select', onSelect);
+
+    resetMeasure(true);
+    els.status.textContent = 'AR active';
+    xrSession.requestAnimationFrame(onXRFrame);
+  }
+
+  function onSessionEnd() {
+    hitTestSource = null;
+    xrSession = null;
+    reticlePose = null;
+    if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    canvas = null;
+    gl = null;
+    show('start');
+  }
+
+  function endAR() {
+    if (xrSession) {
+      xrSession.end().catch(function () {});
+    } else {
+      show('start');
+    }
+  }
+
+  function onOverlayClick(ev) {
+    // Ignore clicks on buttons / inputs
+    const t = ev.target;
+    if (t && (t.closest('button') || t.closest('input') || t.closest('#savePanel'))) return;
+    if (!reticlePose) {
+      els.status.textContent = 'No surface — keep scanning';
+      return;
+    }
+    placePoint(posePosition(reticlePose));
+    els.status.textContent = 'Point placed';
+  }
+
+  function onSelect(ev) {
+    if (!reticlePose) return;
+    placePoint(posePosition(reticlePose));
+    els.status.textContent = 'Point placed';
+  }
+
+  function onXRFrame(time, frame) {
+    if (!xrSession) return;
+    const session = xrSession;
+    session.requestAnimationFrame(onXRFrame);
+
+    const pose = frame.getViewerPose(refSpace);
+    if (!pose) return;
+
+    // Hit test
+    reticlePose = null;
+    previewPoint = null;
+    if (hitTestSource) {
+      const hits = frame.getHitTestResults(hitTestSource);
+      if (hits.length) {
+        const hitPose = hits[0].getPose(refSpace);
+        if (hitPose) {
+          reticlePose = hitPose;
+          previewPoint = posePosition(hitPose);
+          els.status.textContent = 'Surface locked';
+        }
+      } else {
+        els.status.textContent = 'Scanning for surface…';
+      }
+    }
+
+    updateReadout();
+
+    const layer = session.renderState.baseLayer;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.lineWidth(2);
+
+    for (let i = 0; i < pose.views.length; i++) {
+      const view = pose.views[i];
+      const viewport = layer.getViewport(view);
+      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+      const vp = mat4Multiply(view.projectionMatrix, view.transform.inverse.matrix);
+
+      drawReticle(vp, reticlePose);
+      const geom = buildMeasureLines();
+      drawLines(vp, geom.lines, [0.22, 0.74, 0.98, 1.0]);
+      drawPoints(vp, geom.pts, [0.29, 0.87, 0.5, 1.0]);
+    }
+  }
+
+  function renderSavedList() {
+    const items = loadSaved();
+    if (!items.length) {
+      els.savedList.innerHTML = '<div class="empty">No saved measurements yet.</div>';
+      return;
+    }
+    els.savedList.innerHTML = items.map(function (it, idx) {
+      const when = it.ts ? new Date(it.ts).toLocaleString() : '';
+      return (
+        '<div class="saved-item" data-idx="' + idx + '">' +
+          '<div class="name">' + escapeHtml(it.name || (it.mode + ' measurement')) + '</div>' +
+          '<div class="meta">' + escapeHtml(it.mode) + ' · ' + escapeHtml(it.units) + ' · ' + escapeHtml(when) + '</div>' +
+          '<div class="vals">' + escapeHtml(it.detail || it.text || '') + '</div>' +
+          '<div class="btnrow"><button type="button" data-del="' + idx + '" class="danger">Delete</button></div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function doSave(name) {
+    const s = currentSummary();
+    if (!s.ok) {
+      alert('Finish the measurement before saving.');
+      return;
+    }
+    const items = loadSaved();
+    items.unshift({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      ts: Date.now(),
+      name: (name || '').trim(),
+      mode: s.title,
+      units: units === 'imperial' ? 'ft/in' : 'm/cm',
+      text: s.text,
+      detail: s.detail,
+      meters: s.meters
+    });
+    persistSaved(items);
+    els.savePanel.classList.add('hidden');
+    els.saveName.value = '';
+    els.status.textContent = 'Saved on this phone';
+  }
+
+  // Capability check on load
+  async function checkSupport() {
+    let ok = false;
+    if (navigator.xr && navigator.xr.isSessionSupported) {
+      try {
+        ok = await navigator.xr.isSessionSupported('immersive-ar');
+      } catch (e) {
+        ok = false;
+      }
+    }
+    if (!ok) {
+      els.unsupported.classList.remove('hidden');
+      els.btnStart.disabled = true;
+      els.btnStart.textContent = 'AR not supported here';
+    }
+  }
+
+  // Events
+  els.btnStart.addEventListener('click', function () { startAR(); });
+  els.btnOpenHelp.addEventListener('click', function () { show('help'); });
+  els.btnHelpBack.addEventListener('click', function () { show('start'); });
+  els.btnOpenList.addEventListener('click', function () { renderSavedList(); show('list'); });
+  els.btnListBack.addEventListener('click', function () { show(xrSession ? 'ar' : 'start'); });
+  els.btnSavedInAr.addEventListener('click', function () {
+    renderSavedList();
+    show('list');
+  });
+  els.btnDeleteAll.addEventListener('click', function () {
+    if (!loadSaved().length) return;
+    if (confirm('Delete all saved measurements from this phone?')) {
+      persistSaved([]);
+      renderSavedList();
+    }
+  });
+  els.savedList.addEventListener('click', function (ev) {
+    const btn = ev.target.closest('button[data-del]');
+    if (!btn) return;
+    const idx = parseInt(btn.getAttribute('data-del'), 10);
+    const items = loadSaved();
+    items.splice(idx, 1);
+    persistSaved(items);
+    renderSavedList();
+  });
+
+  els.btnExit.addEventListener('click', function () { endAR(); });
+  els.btnUnits.addEventListener('click', function () {
+    units = units === 'imperial' ? 'metric' : 'imperial';
+    updateUnitsButton();
+    updateReadout();
+  });
+  els.modeLine.addEventListener('click', function () { setMode('line'); });
+  els.modeBox.addEventListener('click', function () { setMode('box'); });
+  els.modeRoom.addEventListener('click', function () { setMode('room'); });
+  els.btnUndo.addEventListener('click', function () { undo(); });
+  els.btnReset.addEventListener('click', function () { resetMeasure(true); els.status.textContent = 'Reset'; });
+  els.btnSave.addEventListener('click', function () {
+    const s = currentSummary();
+    if (!s.ok) { alert('Finish the measurement before saving.'); return; }
+    els.savePanel.classList.remove('hidden');
+    els.saveName.focus();
+  });
+  els.btnSaveCancel.addEventListener('click', function () {
+    els.savePanel.classList.add('hidden');
+  });
+  els.btnSaveConfirm.addEventListener('click', function () {
+    doSave(els.saveName.value);
+  });
+
+  updateUnitsButton();
+  checkSupport();
+
+  // Optional same-origin service worker for offline after first load
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function () {
+      // Ignore — offline cache is optional
+    });
+  }
+})();
+</script>
+</body>
+</html>
