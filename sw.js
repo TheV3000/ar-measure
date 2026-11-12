@@ -1,5 +1,5 @@
 /* Private Measure — same-origin offline cache only. No network calls elsewhere. */
-const CACHE = 'private-measure-v1';
+const CACHE = 'private-measure-v2';
 const ASSETS = [
   './',
   './index.html',

@@ -1030,11 +1030,18 @@ ul.tips li { margin-bottom: 6px; }
 
   // Optional same-origin service worker for offline after first load
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(function () {
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(function () {
       // Ignore — offline cache is optional
     });
   }
 })();
+</script>
+<button id="installBtn" type="button" hidden style="position:fixed;right:12px;bottom:12px;z-index:9999;padding:12px 16px;border-radius:10px;border:0;background:#4ade80;color:#0b0f14;font-weight:700">Install app</button>
+<script>
+(function(){var d=null,b=document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();d=e;b.hidden=false;});
+b.addEventListener('click',function(){if(!d)return;d.prompt();d.userChoice.finally(function(){d=null;b.hidden=true;});});
+window.addEventListener('appinstalled',function(){b.hidden=true;});})();
 </script>
 </body>
 </html>
